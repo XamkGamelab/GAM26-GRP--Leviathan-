@@ -13,6 +13,8 @@ public class ParasiteClickable : MonoBehaviour
     private Collider parasiteCollider;
     private bool isAvailable = true;
 
+    public bool IsAvailable => isAvailable;
+
     private void Awake()
     {
         parasiteRenderer = GetComponent<Renderer>();
@@ -26,16 +28,24 @@ public class ParasiteClickable : MonoBehaviour
 
     private void OnMouseDown()
     {
-        if (!isAvailable || resourceManager == null)
-            return;
+        TryCollect();
+    }
 
+    public bool TryCollect()
+    {
+        if (!isAvailable || resourceManager == null)
+        {
+            return false;
+        }
+
+        isAvailable = false;
         resourceManager.CollectBiomass();
         StartCoroutine(HideAndRespawn());
+        return true;
     }
 
     private IEnumerator HideAndRespawn()
     {
-        isAvailable = false;
         parasiteRenderer.enabled = false;
         parasiteCollider.enabled = false;
 
