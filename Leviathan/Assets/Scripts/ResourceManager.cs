@@ -7,6 +7,8 @@ public class ResourceManager : MonoBehaviour
     [SerializeField] private TMP_Text biomassText;
     [SerializeField] private TMP_Text oreText;
     [SerializeField] private TMP_Text energyText;
+    [SerializeField] private TMP_Text airDomeQuestProgressText;
+    [SerializeField, Min(1)] private int airDomeCost = 10;
 
     [SerializeField] private Button biomassUpgradeButton;
     [SerializeField] private TMP_Text biomassUpgradeButtonText;
@@ -15,6 +17,11 @@ public class ResourceManager : MonoBehaviour
     [SerializeField] private TMP_Text biomassCollectorButtonText;
     [SerializeField] private GameObject biomassCollectorPrefab;
     [SerializeField] private Transform biomassCollectorSpawnPoint;
+    [SerializeField] private GameObject airDome;
+    [SerializeField] private Button airDomeGoButton;
+
+    private bool airDomeBuilt;
+    private const string AirDomeBuiltKey = "Leviathan_AirDomeBuilt";
 
     private int biomass;
     private int ore;
@@ -47,6 +54,11 @@ public class ResourceManager : MonoBehaviour
             UpdateUI();
             UpdateUpgradeButton();
             UpdateBiomassCollectorButton();
+
+            if (airDome != null)
+            {
+                airDome.SetActive(false);
+            }
         }
     }
 
@@ -92,6 +104,25 @@ public class ResourceManager : MonoBehaviour
         UpdateBiomassCollectorButton();
     }
 
+    public void BuildAirDome()
+    {
+        if (airDomeBuilt || biomass < airDomeCost)
+        {
+            return;
+        }
+
+        if (airDome == null)
+        {
+            Debug.LogError("Assign AirDome_Blockout in ResourceManager.");
+            return;
+        }
+
+        biomass -= airDomeCost;
+        airDomeBuilt = true;
+        airDome.SetActive(true);
+        UpdateUI();
+    }
+
     private void SpawnBiomassCollector()
     {
         if (biomassCollectorPrefab == null || biomassCollectorSpawnPoint == null)
@@ -115,6 +146,7 @@ public class ResourceManager : MonoBehaviour
         PlayerPrefs.SetInt(EnergyKey, energy);
         PlayerPrefs.SetInt(UpgradeKey, biomassUpgradePurchased ? 1 : 0);
         PlayerPrefs.SetInt(CollectorKey, biomassCollectorBuilt ? 1 : 0);
+        PlayerPrefs.SetInt(AirDomeBuiltKey, airDomeBuilt ? 1 : 0);
         PlayerPrefs.Save();
 
         Debug.Log("Game saved.");
@@ -147,6 +179,13 @@ public class ResourceManager : MonoBehaviour
             SpawnBiomassCollector();
         }
 
+        airDomeBuilt = PlayerPrefs.GetInt(AirDomeBuiltKey, 0) == 1;
+
+        if (airDome != null)
+        {
+            airDome.SetActive(airDomeBuilt);
+        }
+
         UpdateUI();
         UpdateUpgradeButton();
         UpdateBiomassCollectorButton();
@@ -171,6 +210,18 @@ public class ResourceManager : MonoBehaviour
         biomassText.text = $"Biomass: {biomass}";
         oreText.text = $"Ore: {ore}";
         energyText.text = $"Energy: {energy}";
+
+        if (airDomeQuestProgressText != null)
+        {
+            airDomeQuestProgressText.text = airDomeBuilt
+                ? "Completed"
+                : $"Biomass: {biomass} / {airDomeCost}";
+        }
+
+        if (airDomeGoButton != null)
+        {
+            airDomeGoButton.interactable = !airDomeBuilt && biomass >= airDomeCost;
+        }
     }
 
     private void UpdateUpgradeButton()
