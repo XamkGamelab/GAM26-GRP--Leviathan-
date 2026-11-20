@@ -19,9 +19,21 @@ public class ResourceManager : MonoBehaviour
     [SerializeField] private Transform biomassCollectorSpawnPoint;
     [SerializeField] private GameObject airDome;
     [SerializeField] private Button airDomeGoButton;
+    [SerializeField] private TMP_Text workshopQuestProgressText;
+    [SerializeField] private Button workshopGoButton;
+    [SerializeField, Min(1)] private int workshopOreCost = 5;
+    [SerializeField, Min(1)] private int workshopEnergyCost = 5;
+    [SerializeField, Min(1)] private int energyPerSecond = 1;
+    
 
     private bool airDomeBuilt;
     private const string AirDomeBuiltKey = "Leviathan_AirDomeBuilt";
+
+    private bool workshopRepaired;
+    private const string WorkshopRepairedKey = "Leviathan_WorkshopRepaired";
+    private const string EnergyProductionTimerKey = "Leviathan_EnergyProductionTimer";
+
+    private float energyProductionTimer;
 
     private int biomass;
     private int ore;
@@ -123,6 +135,26 @@ public class ResourceManager : MonoBehaviour
         UpdateUI();
     }
 
+    public void RepairWorkshop()
+    {
+        if (!airDomeBuilt || workshopRepaired)
+        {
+            return;
+        }
+
+        if (ore < workshopOreCost || energy < workshopEnergyCost)
+        {
+            return;
+        }
+
+        ore -= workshopOreCost;
+        energy -= workshopEnergyCost;
+        workshopRepaired = true;
+        energyProductionTimer = 0f;
+
+        UpdateUI();
+    }
+
     private void SpawnBiomassCollector()
     {
         if (biomassCollectorPrefab == null || biomassCollectorSpawnPoint == null)
@@ -147,6 +179,8 @@ public class ResourceManager : MonoBehaviour
         PlayerPrefs.SetInt(UpgradeKey, biomassUpgradePurchased ? 1 : 0);
         PlayerPrefs.SetInt(CollectorKey, biomassCollectorBuilt ? 1 : 0);
         PlayerPrefs.SetInt(AirDomeBuiltKey, airDomeBuilt ? 1 : 0);
+        PlayerPrefs.SetInt(WorkshopRepairedKey, workshopRepaired ? 1 : 0);
+        PlayerPrefs.SetFloat(EnergyProductionTimerKey, energyProductionTimer);
         PlayerPrefs.Save();
 
         Debug.Log("Game saved.");
@@ -167,6 +201,9 @@ public class ResourceManager : MonoBehaviour
         biomassPerClick = biomassUpgradePurchased ? 2 : 1;
 
         biomassCollectorBuilt = PlayerPrefs.GetInt(CollectorKey, 0) == 1;
+        workshopRepaired = PlayerPrefs.GetInt(WorkshopRepairedKey, 0) == 1;
+
+        energyProductionTimer = PlayerPrefs.GetFloat(EnergyProductionTimerKey, 0f);
 
         if (biomassCollectorInstance != null)
         {
@@ -242,6 +279,32 @@ public class ResourceManager : MonoBehaviour
         {
             airDomeGoButton.interactable = !airDomeBuilt && biomass >= airDomeCost;
         }
+
+        if (workshopQuestProgressText != null)
+        {
+            if (workshopRepaired)
+            {
+                workshopQuestProgressText.text = "Completed";
+            }
+            else if (!airDomeBuilt)
+            {
+                workshopQuestProgressText.text = "Locked — build the Air Dome first";
+            }
+            else
+            {
+                workshopQuestProgressText.text =
+                    $"Ore: {ore} / {workshopOreCost} | Energy: {energy} / {workshopEnergyCost}";
+            }
+        }
+
+        if (workshopGoButton != null)
+        {
+            workshopGoButton.interactable =
+                airDomeBuilt &&
+                !workshopRepaired &&
+                ore >= workshopOreCost &&
+                energy >= workshopEnergyCost;
+        }
     }
 
     private void UpdateUpgradeButton()
@@ -271,6 +334,24 @@ public class ResourceManager : MonoBehaviour
             biomassCollectorButtonText.text = biomassCollectorBuilt
                 ? "Collector Purchased"
                 : "Build Biomass Collector - 10 Biomass";
+        }
+    }
+
+    private void Update()
+    {
+        if (!workshopRepaired)
+        {
+            return;
+        }
+
+        energyProductionTimer += Time.deltaTime;
+
+        int elapsedSeconds = Mathf.FloorToInt(energyProductionTimer);
+
+        if (elapsedSeconds > 0)
+        {
+            energyProductionTimer -= elapsedSeconds;
+            AddEnergy(elapsedSeconds * energyPerSecond);
         }
     }
 }
