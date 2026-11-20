@@ -205,6 +205,26 @@ public class ResourceManager : MonoBehaviour
         UpdateUI();
     }
 
+    public void SalvageOre()
+    {
+        if (!airDomeBuilt)
+        {
+            return;
+        }
+
+        AddOre(1);
+    }
+
+    public void RecoverEnergy()
+    {
+        if (!airDomeBuilt)
+        {
+            return;
+        }
+
+        AddEnergy(1);
+    }
+
     private void UpdateUI()
     {
         biomassText.text = $"Biomass: {biomass}";
