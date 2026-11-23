@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -25,6 +25,31 @@ public class ResourceManager : MonoBehaviour
     [SerializeField, Min(1)] private int workshopEnergyCost = 5;
     [SerializeField, Min(1)] private int energyPerSecond = 1;
     
+    [Header("Robotic Mining")]
+    [SerializeField] private TMP_Text miningQuestProgressText;
+    [SerializeField] private Button miningGoButton;
+    [SerializeField, Min(0)] private int miningOreCost = 5;
+    [SerializeField, Min(0)] private int miningEnergyCost = 5;
+    [SerializeField, Min(1)] private int orePerSecond = 2;
+    [SerializeField] private GameObject miningRobot;
+
+    [SerializeField] private TMP_Text miningUpgradeProgressText;
+    [SerializeField] private Button miningUpgradeGoButton;
+
+    private int miningLevel = 1;
+    private const int MaxMiningLevel = 100;
+    private const string MiningLevelKey = "Leviathan_MiningLevel";
+
+    private int MiningUpgradeCost =>
+        Mathf.CeilToInt(20f * Mathf.Pow(1.25f, miningLevel - 1));
+
+    private int MiningProduction => orePerSecond + miningLevel - 1;
+
+    private bool miningStarted;
+    private float oreProductionTimer;
+
+    private const string MiningStartedKey = "Leviathan_MiningStarted";
+    private const string OreProductionTimerKey = "Leviathan_OreProductionTimer";
 
     private bool airDomeBuilt;
     private const string AirDomeBuiltKey = "Leviathan_AirDomeBuilt";
@@ -57,6 +82,11 @@ public class ResourceManager : MonoBehaviour
 
     private void Start()
     {
+        if (miningRobot != null)
+        {
+            miningRobot.SetActive(false);
+        }
+
         if (PlayerPrefs.GetInt(SaveExistsKey, 0) == 1)
         {
             LoadGame();
@@ -181,12 +211,15 @@ public class ResourceManager : MonoBehaviour
         PlayerPrefs.SetInt(AirDomeBuiltKey, airDomeBuilt ? 1 : 0);
         PlayerPrefs.SetInt(WorkshopRepairedKey, workshopRepaired ? 1 : 0);
         PlayerPrefs.SetFloat(EnergyProductionTimerKey, energyProductionTimer);
+        PlayerPrefs.SetInt(MiningStartedKey, miningStarted ? 1 : 0);
+        PlayerPrefs.SetFloat(OreProductionTimerKey, oreProductionTimer);
+        PlayerPrefs.SetInt(MiningLevelKey, miningLevel);
         PlayerPrefs.Save();
 
         Debug.Log("Game saved.");
     }
 
-    public void LoadGame()
+     public void LoadGame()
     {
         if (PlayerPrefs.GetInt(SaveExistsKey, 0) == 0)
         {
@@ -204,6 +237,19 @@ public class ResourceManager : MonoBehaviour
         workshopRepaired = PlayerPrefs.GetInt(WorkshopRepairedKey, 0) == 1;
 
         energyProductionTimer = PlayerPrefs.GetFloat(EnergyProductionTimerKey, 0f);
+        miningStarted = PlayerPrefs.GetInt(MiningStartedKey, 0) == 1;
+
+        miningLevel = Mathf.Clamp(PlayerPrefs.GetInt(MiningLevelKey, 1),
+         1,
+         MaxMiningLevel
+        );
+
+        if (miningRobot != null)
+        {
+            miningRobot.SetActive(true);
+        }
+
+        oreProductionTimer = PlayerPrefs.GetFloat(OreProductionTimerKey, 0f);
 
         if (biomassCollectorInstance != null)
         {
@@ -288,7 +334,7 @@ public class ResourceManager : MonoBehaviour
             }
             else if (!airDomeBuilt)
             {
-                workshopQuestProgressText.text = "Locked � build the Air Dome first";
+                workshopQuestProgressText.text = "Locked — build the Air Dome first";
             }
             else
             {
@@ -304,6 +350,60 @@ public class ResourceManager : MonoBehaviour
                 !workshopRepaired &&
                 ore >= workshopOreCost &&
                 energy >= workshopEnergyCost;
+        }
+
+        if (miningQuestProgressText != null)
+        {
+            if (miningStarted)
+            {
+                miningQuestProgressText.text = "Completed";
+            }
+            else if (!workshopRepaired)
+            {
+                miningQuestProgressText.text = "Repair the workshop first";
+            }
+            else
+            {
+                miningQuestProgressText.text =
+                    $"Ore: {ore} / {miningOreCost}\n" +
+                    $"Energy: {energy} / {miningEnergyCost}";
+            }
+        }
+
+        if (miningGoButton != null)
+        {
+            miningGoButton.interactable =
+                workshopRepaired &&
+                !miningStarted &&
+                ore >= miningOreCost &&
+                energy >= miningEnergyCost;
+        }
+
+        if (miningUpgradeProgressText != null)
+        {
+            if (!miningStarted)
+            {
+                miningUpgradeProgressText.text = "Start robotic mining first";
+            }
+            else if (miningLevel >= MaxMiningLevel)
+            {
+                miningUpgradeProgressText.text =
+                    $"Level {miningLevel} | {MiningProduction} Ore/s\nMax level";
+            }
+            else
+            {
+                miningUpgradeProgressText.text =
+                    $"Level {miningLevel} | {MiningProduction} → {MiningProduction + 1} Ore/s\n" +
+                    $"Cost: {MiningUpgradeCost} Ore";
+            }
+        }
+
+        if (miningUpgradeGoButton != null)
+        {
+            miningUpgradeGoButton.interactable =
+                miningStarted &&
+                miningLevel < MaxMiningLevel &&
+                ore >= MiningUpgradeCost;
         }
     }
 
@@ -339,19 +439,75 @@ public class ResourceManager : MonoBehaviour
 
     private void Update()
     {
-        if (!workshopRepaired)
+        if (workshopRepaired)
+        {
+            energyProductionTimer += Time.deltaTime;
+
+            int elapsedSeconds = Mathf.FloorToInt(energyProductionTimer);
+
+            if (elapsedSeconds > 0)
+            {
+                energyProductionTimer -= elapsedSeconds;
+                AddEnergy(elapsedSeconds * energyPerSecond);
+            }
+        }
+
+        if (miningStarted)
+        {
+            oreProductionTimer += Time.deltaTime;
+
+            int elapsedSeconds = Mathf.FloorToInt(oreProductionTimer);
+
+            if (elapsedSeconds > 0)
+            {
+                oreProductionTimer -= elapsedSeconds;
+                AddOre(elapsedSeconds * MiningProduction);
+            }
+        }
+    }
+
+    public void StartRoboticMining()
+    {
+        if (!workshopRepaired || miningStarted)
         {
             return;
         }
 
-        energyProductionTimer += Time.deltaTime;
-
-        int elapsedSeconds = Mathf.FloorToInt(energyProductionTimer);
-
-        if (elapsedSeconds > 0)
+        if (ore < miningOreCost || energy < miningEnergyCost)
         {
-            energyProductionTimer -= elapsedSeconds;
-            AddEnergy(elapsedSeconds * energyPerSecond);
+            return;
         }
+
+        ore -= miningOreCost;
+        energy -= miningEnergyCost;
+
+        miningStarted = true;
+        if (miningRobot != null)
+        {
+            miningRobot.SetActive(true);
+        }
+        oreProductionTimer = 0f;
+
+        UpdateUI();
+    }
+
+    public void UpgradeMining()
+    {
+        if (!miningStarted || miningLevel >= MaxMiningLevel)
+        {
+            return;
+        }
+
+        int cost = MiningUpgradeCost;
+
+        if (ore < cost)
+        {
+            return;
+        }
+
+        ore -= cost;
+        miningLevel++;
+
+        UpdateUI();
     }
 }
