@@ -36,6 +36,13 @@ public class ResourceManager : MonoBehaviour
     [SerializeField] private TMP_Text miningUpgradeProgressText;
     [SerializeField] private Button miningUpgradeGoButton;
 
+    [Header("Workshop Quest Guidance")]
+    [SerializeField] private QuestMarker questMarker;
+    [SerializeField] private Transform oreGuidanceTarget;
+    [SerializeField] private Transform energyGuidanceTarget;
+
+    private bool workshopGuidanceSelected;
+
     private int miningLevel = 1;
     private const int MaxMiningLevel = 100;
     private const string MiningLevelKey = "Leviathan_MiningLevel";
@@ -180,6 +187,12 @@ public class ResourceManager : MonoBehaviour
         ore -= workshopOreCost;
         energy -= workshopEnergyCost;
         workshopRepaired = true;
+        
+        if (questMarker != null)
+        {
+            questMarker.Hide();
+        }
+
         energyProductionTimer = 0f;
 
         UpdateUI();
@@ -405,6 +418,8 @@ public class ResourceManager : MonoBehaviour
                 miningLevel < MaxMiningLevel &&
                 ore >= MiningUpgradeCost;
         }
+
+        UpdateWorkshopGuidance();
     }
 
     private void UpdateUpgradeButton()
@@ -509,5 +524,48 @@ public class ResourceManager : MonoBehaviour
         miningLevel++;
 
         UpdateUI();
+    }
+
+    public void SelectWorkshopQuest()
+    {
+        workshopGuidanceSelected = true;
+        UpdateWorkshopGuidance();
+    }
+
+    public void ClearQuestGuidance()
+    {
+        workshopGuidanceSelected = false;
+
+        if (questMarker != null)
+        {
+            questMarker.Hide();
+        }
+    }
+
+    private void UpdateWorkshopGuidance()
+    {
+        if (!workshopGuidanceSelected || questMarker == null)
+        {
+            return;
+        }
+
+        if (!airDomeBuilt || workshopRepaired)
+        {
+            questMarker.Hide();
+            return;
+        }
+
+        if (ore < workshopOreCost)
+        {
+            questMarker.Show(oreGuidanceTarget);
+        }
+        else if (energy < workshopEnergyCost)
+        {
+            questMarker.Show(energyGuidanceTarget);
+        }
+        else
+        {
+            questMarker.Hide();
+        }
     }
 }

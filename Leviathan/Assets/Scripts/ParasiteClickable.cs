@@ -8,6 +8,7 @@ public class ParasiteClickable : MonoBehaviour
     [SerializeField] private float spawnRadius = 8f;
     [SerializeField] private float surfaceHeight = 0.4f;
     [SerializeField] private float respawnDelay = 3f;
+    [SerializeField] private Renderer spawnSurface;
 
     private Renderer parasiteRenderer;
     private Collider parasiteCollider;
@@ -60,12 +61,29 @@ public class ParasiteClickable : MonoBehaviour
 
     private void MoveToRandomPosition()
     {
-        Vector2 offset = Random.insideUnitCircle * spawnRadius;
+        if (spawnSurface == null)
+        {
+            return;
+        }
+
+        Bounds bounds = spawnSurface.bounds;
+
+        float margin = 0.5f;
+
+        float x = Random.Range(
+            bounds.min.x + margin,
+            bounds.max.x - margin
+        );
+
+        float z = Random.Range(
+            bounds.min.z + margin,
+            bounds.max.z - margin
+        );
 
         transform.position = new Vector3(
-            spawnCenter.position.x + offset.x,
-            spawnCenter.position.y + surfaceHeight,
-            spawnCenter.position.z + offset.y
+            x,
+            bounds.max.y + surfaceHeight,
+            z
         );
     }
 }
