@@ -41,7 +41,17 @@ public class ResourceManager : MonoBehaviour
     [SerializeField] private Transform oreGuidanceTarget;
     [SerializeField] private Transform energyGuidanceTarget;
 
-    private bool workshopGuidanceSelected;
+    private enum GuidedQuest
+    {
+        None,
+        AirDome,
+        Workshop,
+        Mining,
+        MiningUpgrade
+    }
+
+    private GuidedQuest selectedQuest;
+    private float guidanceTimer;
 
     private int miningLevel = 1;
     private const int MaxMiningLevel = 100;
@@ -259,7 +269,7 @@ public class ResourceManager : MonoBehaviour
 
         if (miningRobot != null)
         {
-            miningRobot.SetActive(true);
+            miningRobot.SetActive(miningStarted);
         }
 
         oreProductionTimer = PlayerPrefs.GetFloat(OreProductionTimerKey, 0f);
@@ -419,7 +429,7 @@ public class ResourceManager : MonoBehaviour
                 ore >= MiningUpgradeCost;
         }
 
-        UpdateWorkshopGuidance();
+        UpdateQuestGuidance();
     }
 
     private void UpdateUpgradeButton()
@@ -464,6 +474,18 @@ public class ResourceManager : MonoBehaviour
             {
                 energyProductionTimer -= elapsedSeconds;
                 AddEnergy(elapsedSeconds * energyPerSecond);
+            }
+
+            guidanceTimer += Time.unscaledDeltaTime;
+
+            if (guidanceTimer >= 0.3f)
+            {
+                guidanceTimer = 0f;
+
+                if (selectedQuest != GuidedQuest.None)
+                {
+                    UpdateQuestGuidance();
+                }
             }
         }
 
@@ -526,15 +548,33 @@ public class ResourceManager : MonoBehaviour
         UpdateUI();
     }
 
+    public void SelectAirDomeQuest()
+    {
+        selectedQuest = GuidedQuest.AirDome;
+        UpdateQuestGuidance();
+    }
+
     public void SelectWorkshopQuest()
     {
-        workshopGuidanceSelected = true;
-        UpdateWorkshopGuidance();
+        selectedQuest = GuidedQuest.Workshop;
+        UpdateQuestGuidance();
+    }
+
+    public void SelectMiningQuest()
+    {
+        selectedQuest = GuidedQuest.Mining;
+        UpdateQuestGuidance();
+    }
+
+    public void SelectMiningUpgradeQuest()
+    {
+        selectedQuest = GuidedQuest.MiningUpgrade;
+        UpdateQuestGuidance();
     }
 
     public void ClearQuestGuidance()
     {
-        workshopGuidanceSelected = false;
+        selectedQuest = GuidedQuest.None;
 
         if (questMarker != null)
         {
@@ -542,24 +582,80 @@ public class ResourceManager : MonoBehaviour
         }
     }
 
-    private void UpdateWorkshopGuidance()
+    private void UpdateQuestGuidance()
     {
-        if (!workshopGuidanceSelected || questMarker == null)
+        if (questMarker == null)
         {
             return;
         }
 
-        if (!airDomeBuilt || workshopRepaired)
+        switch (selectedQuest)
         {
-            questMarker.Hide();
-            return;
-        }
+            case GuidedQuest.AirDome:
+                if (!airDomeBuilt && biomass < airDomeCost)
+                {
+                    ShowParasiteGuidance();
+                }
+                else
+                {
+                    questMarker.Hide();
+                }
+                break;
 
-        if (ore < workshopOreCost)
+            case GuidedQuest.Workshop:
+                if (airDomeBuilt && !workshopRepaired)
+                {
+                    ShowResourceGuidance(
+                        workshopOreCost,
+                        workshopEnergyCost
+                    );
+                }
+                else
+                {
+                    questMarker.Hide();
+                }
+                break;
+
+            case GuidedQuest.Mining:
+                if (workshopRepaired && !miningStarted)
+                {
+                    ShowResourceGuidance(
+                        miningOreCost,
+                        miningEnergyCost
+                    );
+                }
+                else
+                {
+                    questMarker.Hide();
+                }
+                break;
+
+            case GuidedQuest.MiningUpgrade:
+                if (miningStarted &&
+                    miningLevel < MaxMiningLevel &&
+                    ore < MiningUpgradeCost)
+                {
+                    questMarker.Show(oreGuidanceTarget);
+                }
+                else
+                {
+                    questMarker.Hide();
+                }
+                break;
+
+            default:
+                questMarker.Hide();
+                break;
+        }
+    }
+
+    private void ShowResourceGuidance(int requiredOre, int requiredEnergy)
+    {
+        if (ore < requiredOre)
         {
             questMarker.Show(oreGuidanceTarget);
         }
-        else if (energy < workshopEnergyCost)
+        else if (energy < requiredEnergy)
         {
             questMarker.Show(energyGuidanceTarget);
         }
@@ -568,4 +664,60 @@ public class ResourceManager : MonoBehaviour
             questMarker.Hide();
         }
     }
+
+    private void ShowParasiteGuidance()
+    {
+        Camera camera = Camera.main;
+
+        if (camera == null)
+        {
+            questMarker.Hide();
+            return;
+        }
+
+        ParasiteClickable[] parasites =
+            FindObjectsByType<ParasiteClickable>(FindObjectsSortMode.None);
+
+        ParasiteClickable nearest = null;
+        float nearestDistance = float.MaxValue;
+
+        foreach (ParasiteClickable parasite in parasites)
+        {
+            if (!parasite.IsAvailable)
+            {
+                continue;
+            }
+
+            Vector3 position = parasite.transform.position;
+            Vector3 viewport = camera.WorldToViewportPoint(position);
+
+            
+            if (viewport.z <= 0f ||
+                viewport.x < 0.05f || viewport.x > 0.95f ||
+                viewport.y < 0.05f || viewport.y > 0.95f)
+            {
+                continue;
+            }
+
+            float distance =
+                (position - camera.transform.position).sqrMagnitude;
+
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearest = parasite;
+            }
+        }
+
+        if (nearest != null)
+        {
+            questMarker.Show(nearest.transform);
+        }
+        else
+        {
+            questMarker.Hide();
+        }
+    }
+
+
 }
