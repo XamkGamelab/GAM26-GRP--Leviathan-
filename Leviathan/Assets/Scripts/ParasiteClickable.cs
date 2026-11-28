@@ -32,7 +32,7 @@ public class ParasiteClickable : MonoBehaviour
         TryCollect();
     }
 
-    public bool TryCollect()
+    public bool TryCollect(bool automatic = false)
     {
         if (!isAvailable || resourceManager == null)
         {
@@ -40,7 +40,7 @@ public class ParasiteClickable : MonoBehaviour
         }
 
         isAvailable = false;
-        resourceManager.CollectBiomass();
+        resourceManager.CollectBiomass(automatic);
         StartCoroutine(HideAndRespawn());
         return true;
     }

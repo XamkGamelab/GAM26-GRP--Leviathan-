@@ -34,7 +34,7 @@ public class BiomassCollectorRobot : MonoBehaviour
 
         if (direction.sqrMagnitude <= collectionDistance * collectionDistance)
         {
-            target.TryCollect();
+            target.TryCollect(true);
             target = null;
             return;
         }

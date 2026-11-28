@@ -133,9 +133,51 @@ public class ResourceManager : MonoBehaviour
         }
     }
 
-    public void CollectBiomass()
+    public void CollectBiomass(bool automatic = false)
     {
         biomass += biomassPerClick;
+
+        if (AnalyticsManager.Instance != null)
+        {
+            AnalyticsManager.Instance.TrackCurrencyEarned(
+                "biomass",
+                biomassPerClick,
+                automatic ? "biomass_collector" : "active_clicking"
+            );
+        }
+
+        UpdateUI();
+    }
+
+    public void AddOre(int amount, string source = "active_clicking")
+    {
+        ore += amount;
+
+        if (AnalyticsManager.Instance != null)
+        {
+            AnalyticsManager.Instance.TrackCurrencyEarned(
+                "ore",
+                amount,
+                source
+            );
+        }
+
+        UpdateUI();
+    }
+
+    public void AddEnergy(int amount, string source = "active_clicking")
+    {
+        energy += amount;
+
+        if (AnalyticsManager.Instance != null)
+        {
+            AnalyticsManager.Instance.TrackCurrencyEarned(
+                "energy",
+                amount,
+                source
+            );
+        }
+
         UpdateUI();
     }
 
@@ -191,6 +233,7 @@ public class ResourceManager : MonoBehaviour
         biomass -= airDomeCost;
         airDomeBuilt = true;
         airDome.SetActive(true);
+        RecordMilestone("air_dome_built");
         UpdateUI();
     }
 
@@ -209,7 +252,8 @@ public class ResourceManager : MonoBehaviour
         ore -= workshopOreCost;
         energy -= workshopEnergyCost;
         workshopRepaired = true;
-        
+        RecordMilestone("workshop_repaired");
+
         if (questMarker != null)
         {
             questMarker.Hide();
@@ -311,17 +355,6 @@ public class ResourceManager : MonoBehaviour
         Debug.Log("Game loaded.");
     }
 
-    public void AddOre(int amount)
-    {
-        ore += amount;
-        UpdateUI();
-    }
-
-    public void AddEnergy(int amount)
-    {
-        energy += amount;
-        UpdateUI();
-    }
 
     public void SalvageOre()
     {
@@ -485,7 +518,10 @@ public class ResourceManager : MonoBehaviour
             if (elapsedSeconds > 0)
             {
                 energyProductionTimer -= elapsedSeconds;
-                AddEnergy(elapsedSeconds * energyPerSecond);
+                AddEnergy(
+                    elapsedSeconds * energyPerSecond,
+                    "workshop_production"
+                );
             }
 
             guidanceTimer += Time.unscaledDeltaTime;
@@ -510,7 +546,10 @@ public class ResourceManager : MonoBehaviour
             if (elapsedSeconds > 0)
             {
                 oreProductionTimer -= elapsedSeconds;
-                AddOre(elapsedSeconds * MiningProduction);
+                AddOre(
+                        elapsedSeconds * MiningProduction,
+                        "robotic_mining"
+                    );
             }
         }
     }
@@ -531,6 +570,7 @@ public class ResourceManager : MonoBehaviour
         energy -= miningEnergyCost;
 
         miningStarted = true;
+        RecordMilestone("robotic_mining_started");
         if (miningRobot != null)
         {
             miningRobot.SetActive(true);
@@ -556,6 +596,18 @@ public class ResourceManager : MonoBehaviour
 
         ore -= cost;
         miningLevel++;
+
+        if (AnalyticsManager.Instance != null)
+        {
+            AnalyticsManager.Instance.RecordEvent(
+                eventName: "upgrade_purchased",
+                upgradeId: "ore_production",
+                currencyType: "ore",
+                cost: cost,
+                level: miningLevel,
+                productionAfter: MiningProduction
+            );
+        }
 
         UpdateUI();
     }
@@ -731,5 +783,57 @@ public class ResourceManager : MonoBehaviour
         }
     }
 
+    private void RecordMilestone(string milestoneId)
+    {
+        if (AnalyticsManager.Instance != null)
+        {
+            AnalyticsManager.Instance.RecordEvent(
+                eventName: "milestone_completed",
+                milestoneId: milestoneId
+            );
+        }
+    }
 
+#if UNITY_EDITOR
+    [ContextMenu("Debug/Reset gameplay progress")]
+    private void ResetGameplayProgress()
+    {
+        if (Application.isPlaying)
+        {
+            Debug.LogWarning(
+                "Stop Play Mode before resetting gameplay progress."
+            );
+            return;
+        }
+
+        string[] keys =
+        {
+            SaveExistsKey,
+            BiomassKey,
+            OreKey,
+            EnergyKey,
+            UpgradeKey,
+            CollectorKey,
+            BiomassTimerKey,
+            AirDomeBuiltKey,
+            WorkshopRepairedKey,
+            EnergyProductionTimerKey,
+            MiningStartedKey,
+            OreProductionTimerKey,
+            MiningLevelKey
+        };
+
+        foreach (string key in keys)
+        {
+            PlayerPrefs.DeleteKey(key);
+        }
+
+        PlayerPrefs.Save();
+
+        Debug.Log(
+            "Gameplay progress reset. Player ID, experiment group " +
+            "and analytics logs preserved. Start Play Mode."
+        );
+    }
+#endif
 }
