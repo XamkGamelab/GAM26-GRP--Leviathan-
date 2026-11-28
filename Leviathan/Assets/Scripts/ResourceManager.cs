@@ -57,8 +57,19 @@ public class ResourceManager : MonoBehaviour
     private const int MaxMiningLevel = 100;
     private const string MiningLevelKey = "Leviathan_MiningLevel";
 
-    private int MiningUpgradeCost =>
-        Mathf.CeilToInt(20f * Mathf.Pow(1.25f, miningLevel - 1));
+    private int MiningUpgradeCost
+    {
+        get
+        {
+            float multiplier = ExperimentManager.Instance != null
+                ? ExperimentManager.Instance.MiningCostMultiplier
+                : 1.25f;
+
+            return Mathf.CeilToInt(
+                20f * Mathf.Pow(multiplier, miningLevel - 1)
+            );
+        }
+    }
 
     private int MiningProduction => orePerSecond + miningLevel - 1;
 
@@ -96,6 +107,7 @@ public class ResourceManager : MonoBehaviour
     private const string UpgradeKey = "Leviathan_BiomassUpgrade";
     private const string CollectorKey = "Leviathan_BiomassCollector";
     private const string BiomassTimerKey = "Leviathan_BiomassTimer";
+
 
     private void Start()
     {
